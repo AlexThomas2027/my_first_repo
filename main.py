@@ -1,35 +1,42 @@
 import random
 
-# ---------------------------------------
-# Dice Betting + Rig Deduction Game (console)
+# ============================================================
+# Dice Betting + Rig Deduction Game
 #
-# What this program does:
-# - The player starts with a bankroll (balance).
-# - Each round, the player can place a bet on a dice outcome.
-# - The dice are secretly "rigged" according to ONE hidden rig rule.
-# - The player can view roll history to spot patterns.
+# What this game is:
+# - You start with a bankroll and place bets on each dice roll.
+# - The dice are secretly rigged using ONE rig rule.
+# - You can keep betting, or you can guess the rig rule at any time.
+# - If you guess correctly, you WIN the game immediately.
 #
-# Win condition:
-# - The player WINS THE GAME by correctly guessing the hidden rig rule.
-# - The player LOSES the game if their balance reaches $0.
-# ---------------------------------------
+# IMPORTANT CLARIFICATION (per professor feedback):
+# - Rig rules depend ONLY on roll history / roll number.
+# - Rig rules do NOT depend on your bet type or wager amount.
+#
+# Rig rules allowed in this project:
+# - Rules that change dice outcomes based on the roll number or past rolls
+# - Rules that force certain totals sometimes or always
+# - Rules that reject certain totals (reroll until allowed)
+# ============================================================
 
 STARTING_BALANCE = 100
 MAX_HISTORY_TO_SHOW = 10
 
+HOUSE_EDGE = 0.05          # 5% house edge
+PAYOUT_CAP_MULT = 12       # max payout multiplier (keeps game sane)
+SNAKE_EYES_MULT = 5        # special payout multiplier regardless of bet
 
-# ----------------------------
+# ------------------------------------------------------------
 # Input helpers
-# ----------------------------
+# ------------------------------------------------------------
 
 def get_int(prompt, min_val=None, max_val=None):
-    """Safe integer input with optional bounds."""
     while True:
         s = input(prompt).strip()
         try:
             val = int(s)
         except ValueError:
-            print("Please enter an integer.")
+            print("Please enter a whole number.")
             continue
 
         if min_val is not None and val < min_val:
@@ -42,11 +49,6 @@ def get_int(prompt, min_val=None, max_val=None):
 
 
 def get_choice(prompt, choices):
-    """
-    Safe choice input.
-    choices: list of strings the user is allowed to enter (case-insensitive).
-    Returns the user's choice lowercased.
-    """
     choices_lower = {c.lower(): c for c in choices}
     while True:
         s = input(prompt).strip().lower()
@@ -55,17 +57,15 @@ def get_choice(prompt, choices):
         print(f"Please choose one of: {', '.join(choices)}")
 
 
-# ----------------------------
-# Base dice rolling
-# ----------------------------
+# ------------------------------------------------------------
+# Dice / probability utilities
+# ------------------------------------------------------------
 
 def roll_two_dice_fair():
-    """Roll two fair six-sided dice."""
     return random.randint(1, 6), random.randint(1, 6)
 
 
 def all_pairs_for_total(total):
-    """Return all (d1, d2) pairs (1..6) that sum to `total`."""
     pairs = []
     for d1 in range(1, 7):
         for d2 in range(1, 7):
@@ -75,166 +75,209 @@ def all_pairs_for_total(total):
 
 
 def roll_with_forced_total(total):
-    """
-    Force the dice to sum to `total` by randomly choosing a valid pair.
-    If total is impossible (not 2..12), fall back to a fair roll.
-    """
     pairs = all_pairs_for_total(total)
     if not pairs:
         return roll_two_dice_fair()
     return random.choice(pairs)
 
 
-# ============================================================
-# Rig Rule Specification
-# ============================================================
-# A rig rule is a function:
-#       rig(history, roll_number) -> (d1, d2)
-#
-# Allowed dependencies:
-#   - roll_number (1-indexed)
-#   - history of previous rolls (list of dicts: {'d1','d2','total'})
-#
-# NOT allowed dependencies:
-#   - bet type
-#   - wager amount
-#   - anything about the player's current bet choice
-#
-# Requirements:
-#   - Must return valid dice values (1-6, 1-6)
-#   - Must NOT modify history directly
-# ============================================================
+def fair_probability_sum(total):
+    # total from 2..12
+    return len(all_pairs_for_total(total)) / 36.0
 
 
-# ----------------------------
-# Rig rule implementations
-# ----------------------------
+def fair_probability_parity(parity):
+    # parity: "odd" or "even"
+    count = 0
+    for d1 in range(1, 7):
+        for d2 in range(1, 7):
+            s = d1 + d2
+            if parity == "odd" and s % 2 == 1:
+                count += 1
+            if parity == "even" and s % 2 == 0:
+                count += 1
+    return count / 36.0
 
-def rig_always_total_7(history, roll_number):
-    """Always force total = 7."""
-    return roll_with_forced_total(7)
+
+def fair_probability_highlow(choice):
+    # choice: "high" means 8-12, "low" means 2-6, and 7 is a loss
+    count = 0
+    for d1 in range(1, 7):
+        for d2 in range(1, 7):
+            s = d1 + d2
+            if s == 7:
+                continue
+            if choice == "high" and s > 7:
+                count += 1
+            if choice == "low" and s < 7:
+                count += 1
+    return count / 36.0
 
 
-def rig_never_total_2_or_12(history, roll_number):
+# ------------------------------------------------------------
+# Rig rule factory (higher-order function)
+#   make_rig(rule_name) -> rig_func(history, roll_num) -> (d1, d2)
+# ------------------------------------------------------------
+
+def make_rig(rule_name):
     """
-    Never allow totals 2 or 12.
-    If a fair roll produces 2 or 12, reroll (bounded attempts).
+    Returns a rig function for the given rule_name.
+
+    IMPORTANT:
+    - Rig rule depends only on roll_num/history
+    - Rig rule does NOT depend on bet type or wager
     """
-    for _ in range(50):
-        d1, d2 = roll_two_dice_fair()
-        if (d1 + d2) not in (2, 12):
-            return d1, d2
-    return roll_two_dice_fair()  # fallback
 
-
-def rig_every_5th_roll_is_7(history, roll_number):
-    """Every 5th roll is forced to total = 7; otherwise fair."""
-    if roll_number % 5 == 0:
+    def always_7(history, roll_num):
         return roll_with_forced_total(7)
-    return roll_two_dice_fair()
+
+    def never_2_or_12(history, roll_num):
+        for _ in range(50):
+            d1, d2 = roll_two_dice_fair()
+            if (d1 + d2) not in (2, 12):
+                return d1, d2
+        return roll_two_dice_fair()
+
+    def every_5th_is_7(history, roll_num):
+        if roll_num % 5 == 0:
+            return roll_with_forced_total(7)
+        return roll_two_dice_fair()
+
+    def after_8_then_9(history, roll_num):
+        if history and history[-1]["total"] == 8:
+            return roll_with_forced_total(9)
+        return roll_two_dice_fair()
+
+    rules = {
+        "always_7": always_7,
+        "never_2_or_12": never_2_or_12,
+        "every_5th_is_7": every_5th_is_7,
+        "after_8_then_9": after_8_then_9,
+    }
+
+    if rule_name not in rules:
+        raise ValueError("Unknown rig rule name.")
+    return rules[rule_name]
 
 
-def rig_after_8_then_9(history, roll_number):
-    """If the previous total was 8, force the next total to 9; otherwise fair."""
-    if history and history[-1]["total"] == 8:
-        return roll_with_forced_total(9)
-    return roll_two_dice_fair()
+RIG_RULE_NAMES = ["always_7", "never_2_or_12", "every_5th_is_7", "after_8_then_9"]
 
 
-# Registry of rig rules (demonstrates higher-order functions: functions stored as values)
-RIG_RULES = {
-    "always_7": rig_always_total_7,
-    "never_2_or_12": rig_never_total_2_or_12,
-    "every_5th_is_7": rig_every_5th_roll_is_7,
-    "after_8_then_9": rig_after_8_then_9,
-}
+def pick_secret_rig():
+    key = random.choice(RIG_RULE_NAMES)
+    return key, make_rig(key)
 
 
-def pick_secret_rig_rule():
-    """
-    Randomly choose ONE rig rule to be the hidden rig for this game.
-    The player does NOT see this value until the game ends (or they win by guessing it).
-    """
-    key = random.choice(list(RIG_RULES.keys()))
-    return key, RIG_RULES[key]
+# ------------------------------------------------------------
+# Bet system (flexible)
+# Instead of hard-coding payouts per bet type,
+# we compute payout from fair win probability.
+# ------------------------------------------------------------
 
-
-def rigged_roll(history, roll_number, rig_func):
-    """
-    Produce a roll using the selected rig function.
-    This is higher-order programming: rig_func is a function passed as an argument.
-    """
-    return rig_func(history, roll_number)
-
-
-# ----------------------------
-# Betting logic / payout logic
-# ----------------------------
-
-def compute_payout_multiplier(bet_type, bet_value, d1, d2):
-    """
-    Returns (multiplier, message).
-
-    Payout model:
-    - If you win: balance increases by wager * multiplier
-    - If you lose: balance decreases by wager
-
-    Special rule:
-    - Snake eyes (1,1) pays 5x wager regardless of bet type.
-    """
-    total = d1 + d2
-
-    # Special rule: snake eyes overrides everything else
-    if d1 == 1 and d2 == 1:
-        return 5, "Snake eyes! Special 5x payout!"
-
-    # BET TYPE: SUM
-    # - Player chooses a total from 2 to 12
-    # - Win if (d1 + d2) == chosen total
+def bet_win_probability(bet_type, bet_value):
     if bet_type == "sum":
-        if total == bet_value:
-            hard_sums = {2, 3, 11, 12}
-            if total in hard_sums:
-                return 4, "You hit a hard sum! 4x payout."
-            return 3, "You hit the sum! 3x payout."
-        return 0, "Missed the sum."
-
-    # BET TYPE: PARITY
-    # - Player chooses odd or even
-    # - Win if the total is odd/even matching the chosen parity
+        return fair_probability_sum(bet_value)
     if bet_type == "parity":
-        parity = "even" if total % 2 == 0 else "odd"
-        if parity == bet_value:
-            return 2, "Correct parity! 2x payout."
-        return 0, "Wrong parity."
+        return fair_probability_parity(bet_value)
+    if bet_type == "highlow":
+        return fair_probability_highlow(bet_value)
+    return 0.0
 
-    # BET TYPE: HIGH/LOW
-    # - Player chooses high or low
-    # - "Low" means totals 2–6
-    # - "High" means totals 8–12
-    # - Rolling exactly 7 is an automatic loss for this bet
+
+def did_win_bet(bet_type, bet_value, d1, d2):
+    total = d1 + d2
+    if bet_type == "sum":
+        return total == bet_value
+    if bet_type == "parity":
+        return ("even" if total % 2 == 0 else "odd") == bet_value
     if bet_type == "highlow":
         if total == 7:
-            return 0, "Rolled 7 (house wins on High/Low)."
-        outcome = "high" if total > 7 else "low"
-        if outcome == bet_value:
-            return 2, "Correct high/low! 2x payout."
-        return 0, "Wrong high/low."
-
-    return 0, "Invalid bet type."
+            return False
+        return ("high" if total > 7 else "low") == bet_value
+    return False
 
 
-# ----------------------------
+def payout_multiplier_from_probability(p_win):
+    """
+    Uses a formula instead of hard-coding per bet type:
+      expected value favors house by HOUSE_EDGE.
+      multiplier approximates: (1 - HOUSE_EDGE) / p_win
+
+    Example:
+      if p_win = 0.5 and house edge = 0.05, multiplier ≈ 1.9
+    """
+    if p_win <= 0:
+        return 0
+    mult = (1.0 - HOUSE_EDGE) / p_win
+    mult = max(1.0, min(mult, PAYOUT_CAP_MULT))
+    # Round to 2 decimals for readability
+    return round(mult, 2)
+
+
+def compute_round_result(wager, bet_type, bet_value, d1, d2):
+    """
+    Returns (delta_balance, message_lines_list)
+    delta_balance is the amount to add to balance (negative = loss).
+
+    Special rule:
+      Snake eyes pays SNAKE_EYES_MULT no matter what you bet.
+    """
+    total = d1 + d2
+    lines = [f"You rolled {d1} + {d2} = {total}."]
+
+    # Snake eyes override
+    if d1 == 1 and d2 == 1:
+        winnings = int(wager * SNAKE_EYES_MULT)
+        lines.append(f"Snake Eyes! Automatic payout: {SNAKE_EYES_MULT}x.")
+        lines.append(f"You win ${winnings}.")
+        return winnings, lines
+
+    # Normal win/lose
+    won = did_win_bet(bet_type, bet_value, d1, d2)
+
+    p_win = bet_win_probability(bet_type, bet_value)
+    mult = payout_multiplier_from_probability(p_win)
+
+    if won:
+        winnings = int(wager * mult)
+        lines.append(f"Win! Payout multiplier: {mult}x (based on difficulty).")
+        lines.append(f"You win ${winnings}.")
+        return winnings, lines
+    else:
+        lines.append("Loss. You lose your wager.")
+        return -wager, lines
+
+
+# ------------------------------------------------------------
 # UI helpers
-# ----------------------------
+# ------------------------------------------------------------
+
+def print_header():
+    print("\n" + "=" * 55)
+    print(" DICE BETTING: RIG DEDUCTION")
+    print("=" * 55)
+    print("Goal: grow your bankroll and identify the secret rig rule.")
+    print("You can guess the rig rule at any time. A correct guess wins instantly.")
+    print("Rig rules affect only dice outcomes (history/roll number), not your bet.\n")
+
+
+def print_instructions():
+    print("BETTING OPTIONS")
+    print("  1) Sum Bet      - Choose a total (2 to 12). Win if dice sum to it.")
+    print("  2) Odd/Even Bet - Choose odd or even. Win if sum matches.")
+    print("  3) High/Low Bet - Choose high (8-12) or low (2-6). 7 always loses.")
+    print("\nPAYOUTS")
+    print("  Payouts are calculated from a probability formula:")
+    print("  harder bets (lower chance) pay more, with a small house edge.")
+    print(f"  Maximum payout multiplier is capped at {PAYOUT_CAP_MULT}x.")
+    print(f"  Special rule: Snake eyes (1+1) pays {SNAKE_EYES_MULT}x no matter what.\n")
+
 
 def print_history(history):
-    """Print the last few rolls so the player can try to spot the rig pattern."""
     if not history:
-        print("No roll history yet.")
+        print("Roll history: (none yet)")
         return
-
-    print("\nRecent rolls:")
+    print("Recent rolls:")
     start = max(0, len(history) - MAX_HISTORY_TO_SHOW)
     for i in range(start, len(history)):
         h = history[i]
@@ -242,131 +285,118 @@ def print_history(history):
 
 
 def choose_bet(balance):
-    """
-    Ask the user for wager + bet type + bet value.
-    Displays payout multipliers so the player understands
-    the risk/reward tradeoff of each bet type.
-    """
+    print("\nChoose your bet:")
+    print("  1) Sum")
+    print("  2) Odd/Even")
+    print("  3) High/Low")
+    b = get_choice("Enter 1, 2, or 3: ", ["1", "2", "3"])
 
-    wager = get_int(f"Enter wager (1 - {balance}): ", 1, balance)
+    wager = get_int(f"Wager (1 - {balance}): ", min_val=1, max_val=balance)
 
-    print("\nChoose bet type (risk vs reward shown below):")
-    print("--------------------------------------------------")
-
-    print("1) SUM BET")
-    print("   - Pick an exact total (2-12).")
-    print("   - Payout: 3x your wager if correct.")
-    print("   - Hard sums (2, 3, 11, 12) pay 4x.")
-    print("   - Higher risk, higher reward.")
-
-    print("\n2) PARITY BET")
-    print("   - Pick odd or even total.")
-    print("   - Payout: 2x your wager if correct.")
-    print("   - Medium risk, medium reward.")
-
-    print("\n3) HIGH/LOW BET")
-    print("   - Pick low (2-6) or high (8-12).")
-    print("   - Rolling 7 is an automatic loss.")
-    print("   - Payout: 2x your wager if correct.")
-    print("   - Lower risk, lower reward.")
-
-    print("--------------------------------------------------")
-
-    bet_menu = get_choice("Type 1, 2, or 3: ", ["1", "2", "3"])
-
-    if bet_menu == "1":
-        return wager, "sum", get_int("Pick sum (2-12): ", 2, 12)
-
-    elif bet_menu == "2":
-        return wager, "parity", get_choice("Pick odd/even: ", ["odd", "even"])
-
+    if b == "1":
+        bet_type = "sum"
+        bet_value = get_int("Pick a sum (2-12): ", min_val=2, max_val=12)
+    elif b == "2":
+        bet_type = "parity"
+        bet_value = get_choice("Pick odd or even: ", ["odd", "even"])
     else:
-        return wager, "highlow", get_choice("Pick high/low: ", ["high", "low"])
+        bet_type = "highlow"
+        bet_value = get_choice("Pick high or low: ", ["high", "low"])
+
+    # Show estimated payout (based on fair probability)
+    p_win = bet_win_probability(bet_type, bet_value)
+    est_mult = payout_multiplier_from_probability(p_win)
+    print(f"Estimated payout multiplier (if you win): ~{est_mult}x")
+
+    return wager, bet_type, bet_value
 
 
-def guess_rig_rule_name():
+def guess_rig_rule():
+    print("\nGuess the rig rule (type exactly):")
+    for name in RIG_RULE_NAMES:
+        print(f"  - {name}")
+    return get_choice("Your guess: ", RIG_RULE_NAMES)
+
+
+def choose_rig_mode():
     """
-    Prompt user to guess the rig rule name.
-    If the guess is correct, the player wins the game immediately.
+    Professor asked to allow user to specify a rig rule (higher-order functions).
+    We keep it optional to avoid hurting the normal gameplay flow.
     """
-    print("\nGuess the rig rule (guessing correctly WINS the game):")
-    for k in RIG_RULES:
-        print(f" - {k}")
-    return get_choice("Your guess: ", list(RIG_RULES.keys()))
+    print("Rig setup:")
+    print("  1) Secret random rig (recommended gameplay)")
+    print("  2) Choose a rig rule (for testing / demonstration)")
+    choice = get_choice("Enter 1 or 2: ", ["1", "2"])
+    if choice == "1":
+        return pick_secret_rig()
+    else:
+        print("\nChoose a rig rule:")
+        for name in RIG_RULE_NAMES:
+            print(f"  - {name}")
+        key = get_choice("Rig rule: ", RIG_RULE_NAMES)
+        return key, make_rig(key)
 
 
-# ----------------------------
-# Main game loop
-# ----------------------------
+# ------------------------------------------------------------
+# Main loop
+# ------------------------------------------------------------
 
 def main():
-    print("Welcome to the Dice Betting + Rig Deduction Game!")
-    print(f"Starting balance: ${STARTING_BALANCE}")
-    print("Special rule: snake eyes (1 and 1) pays 5x your wager.")
-    print("Goal: Deduce the rig rule from roll history and guess it correctly to WIN.\n")
+    print_header()
+    print_instructions()
 
     balance = STARTING_BALANCE
     history = []
-    roll_number = 0
+    roll_num = 0
 
-    # The computer secretly selects the rig rule at the start of the game.
-    secret_key, rig_func = pick_secret_rig_rule()
+    secret_key, rig_func = choose_rig_mode()
 
     while True:
-        # Lose condition
         if balance <= 0:
-            print("Out of money. Game over.")
+            print("\nYou are out of money. Game over.")
             print(f"The rig rule was: {secret_key}")
             break
 
-        print(f"\nBalance: ${balance}")
+        print("\n" + "-" * 55)
+        print(f"Balance: ${balance}")
         print_history(history)
 
-        action = get_choice("\nChoose an action: (p)lay, (g)uess rig, (q)uit: ", ["p", "g", "q"])
+        print("\nWhat would you like to do?")
+        print("  p) Play a round")
+        print("  g) Guess the rig rule (correct guess wins instantly)")
+        print("  q) Quit")
+        action = get_choice("Choice (p/g/q): ", ["p", "g", "q"])
 
         if action == "q":
-            print("You quit the game.")
+            print("\nThanks for playing!")
             print(f"The rig rule was: {secret_key}")
             break
 
         if action == "g":
-            guess = guess_rig_rule_name()
-
-            # WIN CONDITION:
-            # If the player guesses the rig rule correctly, they win immediately.
+            guess = guess_rig_rule()
             if guess == secret_key:
-                print("\nCorrect! You guessed the rig rule and WIN the game!")
-                print(f"Final balance: ${balance}")
+                print("\nCorrect! You identified the rig rule.")
+                print(f"You win with a final balance of ${balance}!")
                 break
             else:
-                # Small penalty to discourage random guessing
                 penalty = min(5, balance)
                 balance -= penalty
-                print(f"\nIncorrect guess. You lose ${penalty}.")
-            continue
+                print(f"\nIncorrect. Penalty: -${penalty}.")
+                continue
 
-        # action == "p": play a betting round
+        # Play a round
         wager, bet_type, bet_value = choose_bet(balance)
 
-        roll_number += 1
-        d1, d2 = rigged_roll(history, roll_number, rig_func)
+        roll_num += 1
+        d1, d2 = rig_func(history, roll_num)
         total = d1 + d2
-
-        print(f"\nRolled: {d1} + {d2} = {total}")
-
-        # Store roll in history for deduction
         history.append({"d1": d1, "d2": d2, "total": total})
 
-        multiplier, message = compute_payout_multiplier(bet_type, bet_value, d1, d2)
-        print(message)
+        delta, lines = compute_round_result(wager, bet_type, bet_value, d1, d2)
+        for line in lines:
+            print(line)
 
-        if multiplier > 0:
-            winnings = wager * multiplier
-            balance += winnings
-            print(f"You won ${winnings}!")
-        else:
-            balance -= wager
-            print(f"You lost ${wager}.")
+        balance += delta
 
     print("\nGame ended.")
 
