@@ -1,31 +1,25 @@
-# Dice Betting Game
+Dice Betting Game
 
-## Overview
+This project is a dice betting game written in Python. The player places bets
+on the outcome of two six-sided dice. The game supports several types of bets
+including betting on the total of the dice, whether the result is odd or even,
+and whether the total is high or low.
 
-This project implements a dice betting game in Python.
+Payouts are calculated using probability-based formulas rather than
+hard-coded values. The program also includes rig functions that can modify
+dice outcomes for testing purposes.
 
-The player places a bet, the dice are rolled, and payouts are determined based on the result and a configurable rig rule. The design uses higher-order functions to allow different rig behaviors without modifying the core game logic.
+How to Run the Game
 
-## Files
+Open a terminal, navigate to the project folder, and run:
 
-- main.py  
-  Contains the core game logic and game flow.
+python3 main.py
 
-- TestSuiteForMainGame.py  
-  Contains the full unit test suite for the project.
+How to Run the Test Suite
 
-## How to Run the Game
+The project includes an automated test suite that verifies the correctness
+of the probability calculations, betting logic, and rig behavior.
 
-Run:
+To run the tests:
 
-    python main.py
-
-## How to Run the Tests
-
-Run:
-
-    python TestSuiteForMainGame.py
-
-## Design Notes
-
-The rig rule is implemented using a higher-order function. This means a function is passed into the game logic to determine payout behavior rather than hard-coding specific conditions. This makes the system flexible and easy to extend.
+python3 TestSuiteForMainGame.py
