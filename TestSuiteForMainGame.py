@@ -1,94 +1,84 @@
-# test_game.py
-# A simple test suite for main.py using assert statements.
-# Run with: python3 test_game.py
+import unittest
+import main
 
-from main import (
-    roll_with_forced_total,
-    rig_always_total_7,
-    rig_never_total_2_or_12,
-    rig_every_5th_roll_is_7,
-    rig_after_8_then_9,
-    compute_payout_multiplier
-)
 
-def run_tests():
-    # ----------------------------
-    # TEST 1: roll_with_forced_total always returns the correct sum
-    # ----------------------------
-    for _ in range(50):
-        d1, d2 = roll_with_forced_total(7)
-        assert 1 <= d1 <= 6 and 1 <= d2 <= 6
-        assert d1 + d2 == 7
-    print("Test 1 passed: roll_with_forced_total(7) always sums to 7.")
+class TestDiceGame(unittest.TestCase):
 
-    # ----------------------------
-    # TEST 2: rig_always_total_7 always produces total 7
-    # ----------------------------
-    history = []
-    for roll_num in range(1, 51):
-        d1, d2 = rig_always_total_7(history, roll_num)
-        assert d1 + d2 == 7
-    print("Test 2 passed: rig_always_total_7 always returns total 7.")
+    def test_all_pairs_for_total(self):
+        pairs_7 = main.all_pairs_for_total(7)
+        self.assertEqual(len(pairs_7), 6)
+        self.assertEqual(pairs_7[0], (1, 6))
+        self.assertEqual(pairs_7[-1], (6, 1))
 
-    # ----------------------------
-    # TEST 3: rig_never_total_2_or_12 never returns 2 or 12
-    # ----------------------------
-    history = []
-    for roll_num in range(1, 201):
-        d1, d2 = rig_never_total_2_or_12(history, roll_num)
-        total = d1 + d2
-        assert total != 2 and total != 12
-    print("Test 3 passed: rig_never_total_2_or_12 never returns 2 or 12.")
+        pairs_2 = main.all_pairs_for_total(2)
+        self.assertEqual(pairs_2, [(1, 1)])
 
-    # ----------------------------
-    # TEST 4: rig_every_5th_roll_is_7 forces roll 5,10,15,... to be 7
-    # ----------------------------
-    history = []
-    for roll_num in range(1, 51):
-        d1, d2 = rig_every_5th_roll_is_7(history, roll_num)
-        total = d1 + d2
-        if roll_num % 5 == 0:
-            assert total == 7
-        # update history like the real game would
-        history.append({"d1": d1, "d2": d2, "total": total})
-    print("Test 4 passed: rig_every_5th_roll_is_7 forces every 5th roll to 7.")
+        pairs_12 = main.all_pairs_for_total(12)
+        self.assertEqual(pairs_12, [(6, 6)])
 
-    # ----------------------------
-    # TEST 5: rig_after_8_then_9 forces 9 after an 8
-    # ----------------------------
-    history = [{"d1": 2, "d2": 6, "total": 8}]  # previous roll total = 8
-    d1, d2 = rig_after_8_then_9(history, 2)
-    assert d1 + d2 == 9
-    print("Test 5 passed: rig_after_8_then_9 forces 9 after an 8.")
+    def test_fair_probability_sum(self):
+        self.assertAlmostEqual(main.fair_probability_sum(7), 6 / 36)
+        self.assertAlmostEqual(main.fair_probability_sum(2), 1 / 36)
 
-    # ----------------------------
-    # TEST 6: Snake eyes always pays 5x regardless of bet type
-    # ----------------------------
-    mult, _ = compute_payout_multiplier("sum", 7, 1, 1)
-    assert mult == 5
-    mult, _ = compute_payout_multiplier("parity", "even", 1, 1)
-    assert mult == 5
-    mult, _ = compute_payout_multiplier("highlow", "high", 1, 1)
-    assert mult == 5
-    print("Test 6 passed: snake eyes pays 5x regardless of bet type.")
+    def test_fair_probability_parity(self):
+        p_even = main.fair_probability_parity("even")
+        p_odd = main.fair_probability_parity("odd")
+        self.assertAlmostEqual(p_even + p_odd, 1.0)
 
-    # ----------------------------
-    # TEST 7: Parity bet payout (correct vs incorrect)
-    # ----------------------------
-    mult, _ = compute_payout_multiplier("parity", "even", 2, 4)  # total=6 even
-    assert mult == 2
-    mult, _ = compute_payout_multiplier("parity", "odd", 2, 4)   # total=6 even
-    assert mult == 0
-    print("Test 7 passed: parity payout works for correct/incorrect.")
+    def test_fair_probability_highlow(self):
+        p_high = main.fair_probability_highlow("high")
+        p_low = main.fair_probability_highlow("low")
+        self.assertTrue(p_high > 0)
+        self.assertTrue(p_low > 0)
+        self.assertTrue(p_high + p_low < 1.0)
 
-    # ----------------------------
-    # TEST 8: High/Low rules (7 always loses)
-    # ----------------------------
-    mult, _ = compute_payout_multiplier("highlow", "high", 3, 4)  # total=7
-    assert mult == 0
-    print("Test 8 passed: high/low loses on 7.")
+    def test_bet_win_probability(self):
+        self.assertAlmostEqual(main.bet_win_probability("sum", 7), 6 / 36)
+        self.assertAlmostEqual(main.bet_win_probability("parity", "even"), 18 / 36)
+        self.assertAlmostEqual(main.bet_win_probability("highlow", "high"), 15 / 36)
 
-    print("\n✅ All tests passed!")
+    def test_did_win_bet_sum(self):
+        self.assertTrue(main.did_win_bet("sum", 7, 3, 4))
+        self.assertFalse(main.did_win_bet("sum", 8, 3, 4))
+
+    def test_did_win_bet_parity(self):
+        self.assertTrue(main.did_win_bet("parity", "even", 3, 3))
+        self.assertFalse(main.did_win_bet("parity", "odd", 3, 3))
+
+    def test_did_win_bet_highlow(self):
+        self.assertTrue(main.did_win_bet("highlow", "high", 6, 6))
+        self.assertTrue(main.did_win_bet("highlow", "low", 1, 2))
+        self.assertFalse(main.did_win_bet("highlow", "high", 3, 4))
+
+    def test_payout_multiplier_formula(self):
+        mult_easy = main.payout_multiplier_from_probability(0.5)
+        mult_hard = main.payout_multiplier_from_probability(1 / 36)
+        self.assertTrue(mult_hard >= mult_easy)
+        self.assertTrue(mult_hard <= main.PAYOUT_CAP_MULT)
+
+    def test_snake_eyes_override(self):
+        delta, lines = main.compute_round_result(10, "sum", 7, 1, 1)
+        self.assertEqual(delta, 10 * main.SNAKE_EYES_MULT)
+        self.assertTrue(any("Snake Eyes" in line for line in lines))
+
+    def test_make_rig_returns_callable(self):
+        rig = main.make_rig("always_7")
+        self.assertTrue(callable(rig))
+
+    def test_rig_always_7(self):
+        rig = main.make_rig("always_7")
+        d1, d2 = rig([], 1)
+        self.assertEqual(d1 + d2, 7)
+
+    def test_rig_never_2_or_12(self):
+        rig = main.make_rig("never_2_or_12")
+        for i in range(20):
+            d1, d2 = rig([], i + 1)
+            self.assertNotIn(d1 + d2, [2, 12])
+
 
 if __name__ == "__main__":
-    run_tests()
+    print("\n========================================")
+    print(" Running Dice Game Test Suite")
+    print("========================================\n")
+    unittest.main(verbosity=2)
