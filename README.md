@@ -1,3 +1,5 @@
+Alex Thomas & Liv MacMillan
+
 Dice Betting Game
 
 This project is a dice betting game written in Python. The player places bets
