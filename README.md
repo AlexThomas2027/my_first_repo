@@ -66,8 +66,6 @@ Once the rule is correctly guessed, the game ends and the player’s final balan
 
 python main.py
 
-(or run the specific game file if it has a different name).
-
 The game will start in the terminal and prompt the player for input.
 
 ## Libraries Used
