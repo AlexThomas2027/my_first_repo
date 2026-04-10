@@ -6,7 +6,50 @@ HOUSE_EDGE = 0.05
 MAX_PAYOUT_MULTIPLIER = 12
 SNAKE_EYES_MULTIPLIER = 5
 
-
+DICE_ART = {
+    1: [
+        "+-------+",
+        "|       |",
+        "|   *   |",
+        "|       |",
+        "+-------+"
+    ],
+    2: [
+        "+-------+",
+        "| *     |",
+        "|       |",
+        "|     * |",
+        "+-------+"
+    ],
+    3: [
+        "+-------+",
+        "| *     |",
+        "|   *   |",
+        "|     * |",
+        "+-------+"
+    ],
+    4: [
+        "+-------+",
+        "| *   * |",
+        "|       |",
+        "| *   * |",
+        "+-------+"
+    ],
+    5: [
+        "+-------+",
+        "| *   * |",
+        "|   *   |",
+        "| *   * |",
+        "+-------+"
+    ],
+    6: [
+        "+-------+",
+        "| *   * |",
+        "| *   * |",
+        "| *   * |",
+        "+-------+"
+    ]
+}
 def get_int(prompt, min_val=None, max_val=None):
     while True:
         s = input(prompt).strip()
@@ -55,7 +98,14 @@ def roll_with_forced_total(total):
         return roll_two_dice_fair()
     return random.choice(pairs)
 
+def print_ascii_dice(d1, d2):
+    die1 = DICE_ART[d1]
+    die2 = DICE_ART[d2]
 
+    print("\nDice rolled:")
+    for line1, line2 in zip(die1, die2):
+        print(line1 + "   " + line2)
+        
 def fair_probability_sum(total):
     return len(all_pairs_for_total(total)) / 36.0
 
@@ -418,6 +468,8 @@ def main():
             roll_number += 1
             d1, d2 = rig_function(history, roll_number)
             total = d1 + d2
+
+            print_ascii_dice(d1, d2)
 
             history.append({
                 "d1": d1,
