@@ -356,11 +356,18 @@ def print_history(history):
         print("Roll history: none yet")
         return
 
-    print("Recent roll history:")
+    print("\nRecent roll history:")
+    print("-" * 28)
+    print(f"{'Roll':<6}{'Dice':<10}{'Total':<7}")
+    print("-" * 28)
+
     start = max(0, len(history) - MAX_HISTORY_TO_SHOW)
     for i in range(start, len(history)):
         roll = history[i]
-        print(f"  Roll {i+1}: {roll['d1']} + {roll['d2']} = {roll['total']}")
+        dice_pair = f"{roll['d1']} + {roll['d2']}"
+        print(f"{i+1:<6}{dice_pair:<10}{roll['total']:<7}")
+
+    print("-" * 28)
 
 
 def choose_bet(balance):
