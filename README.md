@@ -1,84 +1,89 @@
-Alex Thomas & Liv MacMillan
+Alex Thomas and Liv MacMillan
 
- # Dice Betting Game with Hidden Rig Rule
+Dice Betting Game
 
-## Overview
+Overview
 
-This program is a command-line dice betting game where the player bets on the outcome of two dice. However, the dice may be **rigged according to a hidden rule**, and the player must try to discover the rule in order to win the game.
+This project is a dice betting game in which the player bets on the outcomes of two dice rolls. The main twist is that a hidden rule secretly rigs the dice, and the player must figure out what that rule is to win.
 
-For trial runs, players can create their own rig rule to test how the rigging works. 
+There are two versions of the game:
+- `main.py` → command-line version
+- `gui_game.py` → graphical version 
 
-The player starts with a balance of $100 and can play rounds while observing the results of the dice rolls. By studying the roll history, the player can attempt to guess the hidden rig rule that is affecting the dice.
+---
 
-## How the Game Works
+How the Game Works
 
-Each round the player chooses one of three actions:
+You start with a set amount of money and play rounds of betting.
 
-1. Play a round – place a bet on the outcome of the dice  
-2. Guess the rig rule – try to identify how the dice are being manipulated  
-3. Quit – end the game and reveal the rig rule  
+Each round:
+1. Choose a bet type
+2. Enter a bet value
+3. Enter your wager
+4. Play the round
 
-If the player chooses to play a round, they must select:
+After each roll, your balance updates, and the result is added to a **roll history**.
 
-- A wager amount
-- A type of bet (such as betting on a specific total)
+Your goal is to:
+- Make money through betting
+- Watch for patterns in the dice
+- Guess the hidden rig rule before running out of money
 
-The dice are rolled and the result is displayed. The player’s balance increases or decreases depending on the outcome of the bet.
+---
 
-The game also displays a history of recent dice rolls so the player can analyze patterns.
+Bet Types
 
-## The Rigged Dice System
+- Sum → pick a number from 2–12  
+- Odd/Even → choose odd or even  
+- Hgh/Low 
+  - Low = 2–6  
+  - High = 8–12  
+  - 7 always loses  
 
-Unlike a normal dice game, the dice in this program may follow a **rig rule**. A rig rule changes how the dice behave under certain conditions.
+Payouts are based on probability, so harder bets pay more.
 
-Examples of possible rig rules include:
+---
 
-- Always forcing the dice to total a specific number
-- Never allowing certain totals (such as 2 or 12)
-- Forcing a specific total every N rolls
-- Changing the next roll when the previous roll has a specific total
+Hidden Rig Rules
 
-The player does **not know which rig rule is active**. By observing the roll history, the player can look for patterns in the dice results.
+The dice are not always random. Each game has a hidden rule that affects the results.
 
-The goal of the game is to figure out how the dice are being manipulated.
+Examples:
+- Always forcing a certain total  
+- Never allowing certain totals  
+- Forcing a number every few rolls  
+- Changing behavior based on previous roles  
 
-## Guessing the Rig Rule
+You need to use the roll history to figure out what is happening.
 
-At any time, the player can choose the option to **guess the rig rule**.
+---
 
-If the player correctly identifies how the dice are being rigged, the game ends and the player wins.
+Custom Rig Rules
 
-If the guess is incorrect, a small penalty is applied to the player's balance and the game continues.
+You can also create your own rig rule before the game starts.
 
-## Winning the Game
+This lets you:
+- test different patterns
+- understand how the game works better
 
-The player wins by correctly identifying the hidden rig rule that controls the dice.
+---
 
-Once the rule is correctly guessed, the game ends and the player’s final balance is displayed.
+GUI Version
 
-## How to Run the Program
+The GUI version (`gui_game.py`) is the main version of the game.
 
-1. Make sure Python is installed on your computer.
+It includes:
+- A betting panel
+- ASCII dice display
+- Roll history tracker
+- Result output box
+- Rule guessing section
 
-2. Navigate to the project folder in the terminal.
+It is easier to use and makes the game more interactive than the command-line version.
 
-3. Run the program with:
+---
 
-python main.py
+How to Run
 
-The game will start in the terminal and prompt the player for input.
-
-## Libraries Used
-
-This project uses only standard Python libraries:
-
-- `random` – used to simulate dice rolls
-- `unittest` – used to test functions in the program
-
-No external libraries are required.
-
-## Notes
-
-The rig rule is intentionally hidden from the player during gameplay. The player must analyze the dice roll history to determine how the dice are being manipulated.
-
-This creates a puzzle element in addition to the betting mechanics of the game.
+Run the GUI version:
+python3 gui_game.py
